@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BoltIQ — Driver Quiz</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f0f4f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111}
+.wrap{max-width:480px;margin:0 auto;padding:1rem;min-height:100vh}
+.hdr{background:linear-gradient(135deg,#1e7a2e,#39B54A,#4dc85e);border-radius:16px;padding:1.75rem 1.5rem 1.35rem;text-align:center;margin-bottom:1rem}
+.hdr h1{font-size:22px;font-weight:700;color:rgba(255,255,255,.92)}
+.hdr p{font-size:13px;color:rgba(255,255,255,.78);margin-top:3px}
+.card{background:#fff;border:1px solid #e0e8e0;border-radius:16px;padding:1.35rem;margin-bottom:.85rem}
+label{font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:.3rem;margin-top:.75rem}
+label:first-child{margin-top:0}
+input,select,textarea{width:100%;padding:.65rem .9rem;border:1.5px solid #d0d8d0;border-radius:9px;font-size:14px;color:#111;background:#fff;margin-bottom:.25rem;outline:none;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:#39B54A}
+textarea{min-height:72px;resize:vertical}
+.btn-p{display:block;width:100%;padding:.8rem 1rem;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;text-align:center;margin-bottom:.6rem;font-family:inherit;border:none;background:#39B54A;color:#fff}
+.btn-p:hover{background:#2da33e}
+.btn-p:disabled{background:#9dd4a8;cursor:not-allowed}
+.btn-s{display:block;width:100%;padding:.75rem 1rem;border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;text-align:center;margin-bottom:.6rem;font-family:inherit;background:#fff;border:2px solid #39B54A;color:#1e7a2e}
+.btn-s:hover{background:#f0faf0}
+.btn-g{display:block;width:100%;padding:.6rem 1rem;border-radius:11px;font-size:13px;font-weight:600;cursor:pointer;text-align:center;margin-bottom:.4rem;font-family:inherit;border:none;background:transparent;color:#666}
+.btn-g:hover{background:#eee;color:#333}
+.btn-d{display:block;width:100%;padding:.75rem 1rem;border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;text-align:center;margin-bottom:.6rem;font-family:inherit;border:2px solid #fca5a5;background:#fee2e2;color:#b91c1c}
+.btn-sm{display:inline-flex;align-items:center;padding:.3rem .7rem;font-size:12px;border-radius:7px;border:1.5px solid;cursor:pointer;font-family:inherit;font-weight:600;gap:4px}
+.tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:1rem}
+.tab{padding:.5rem;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;text-align:center}
+.tab-on{background:#39B54A;color:#fff;border:2px solid #39B54A}
+.tab-off{background:#fff;color:#555;border:2px solid #e0e8e0}
+.bdg{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700}
+.bdg-tf{background:#dbeafe;color:#1d4ed8}
+.bdg-mc{background:#fef9c3;color:#92400e}
+.bdg-easy{background:#dcfce7;color:#15803d}
+.bdg-med{background:#fef9c3;color:#92400e}
+.bdg-hard{background:#fee2e2;color:#b91c1c}
+.opt{display:block;width:100%;padding:.85rem 1rem;border-radius:11px;border:2px solid #d0dcd0;background:#fff;color:#111;font-size:14px;text-align:left;cursor:pointer;margin-bottom:.55rem;font-weight:500;font-family:inherit}
+.opt:hover:not(:disabled){border-color:#39B54A;background:#f5fbf5}
+.opt-ok{border-color:#22c55e!important;background:#dcfce7!important;color:#15803d!important;font-weight:700!important;cursor:default!important}
+.opt-no{border-color:#ef4444!important;background:#fee2e2!important;color:#b91c1c!important;cursor:default!important}
+.fb{border-radius:11px;padding:.85rem 1rem;font-size:13px;line-height:1.6;margin-bottom:.85rem;font-weight:500}
+.fb-ok{background:#dcfce7;color:#15803d;border-left:4px solid #22c55e}
+.fb-no{background:#fee2e2;color:#b91c1c;border-left:4px solid #ef4444}
+.fb-to{background:#fef9c3;color:#92400e;border-left:4px solid #f59e0b}
+.al-ok{border-radius:8px;padding:.5rem .8rem;font-size:12px;font-weight:600;margin-top:.4rem;background:#dcfce7;color:#15803d;border-left:3px solid #22c55e}
+.al-er{border-radius:8px;padding:.5rem .8rem;font-size:12px;font-weight:600;margin-top:.4rem;background:#fee2e2;color:#b91c1c;border-left:3px solid #ef4444}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.85rem}
+.stat{background:#fff;border:1px solid #e0e8e0;border-radius:11px;padding:.9rem;text-align:center}
+.ri{border:1px solid #e0e8e0;border-radius:11px;padding:.9rem;margin-bottom:.65rem;background:#fff}
+.ri-ok{border-left:4px solid #22c55e}
+.ri-no{border-left:4px solid #ef4444}
+.ri-to{border-left:4px solid #f59e0b}
+.qrow{background:#f8faf8;border:1px solid #e0e8e0;border-radius:10px;padding:.85rem;margin-bottom:.5rem}
+.lbr{display:flex;align-items:center;gap:10px;padding:.65rem 0;border-bottom:1px solid #f0f5f0;font-size:13px}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:100;padding:1rem}
+.modal{background:#fff;border-radius:16px;padding:1.35rem;width:100%;max-width:440px;max-height:85vh;overflow-y:auto}
+.divider{border:none;border-top:1px solid #e8eee8;margin:.85rem 0}
+.timer{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;font-size:17px;font-weight:800}
+.progress{height:6px;background:#e0e8e0;border-radius:999px;overflow:hidden;margin-bottom:.9rem}
+.progress-bar{height:100%;background:#39B54A;border-radius:999px;transition:width .3s}
+.tip{background:#e8f7ea;border:1px solid #b7e4bf;border-radius:10px;padding:.75rem 1rem;font-size:12px;color:#1e7a2e;margin-bottom:.85rem;font-weight:600}
+.lb-live{display:inline-block;background:#dcfce7;color:#15803d;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;margin-left:8px}
+.lb-loading{text-align:center;padding:2rem;color:#888;font-size:14px}
+.lb-err{text-align:center;padding:1.5rem;color:#b91c1c;font-size:13px;background:#fee2e2;border-radius:10px}
+.streak{display:inline-block;background:#e8f7ea;color:#1e7a2e;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:800;margin-left:8px}
+</style>
+</head>
+<body>
+<div id="app" class="wrap"></div>
+<script>
+const PIN="2727";
+const KQ="biq_qh",KP="biq_ph";
+const G="#39B54A",GD="#1e7a2e";
+const SB_URL="https://ppbhthzsezvqfjlwtzsm.supabase.co";
+const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwYmh0aHpzZXp2cWZqbHd0enNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1OTkyMjksImV4cCI6MjA5NjE3NTIyOX0.tGt2ogk-XiRMIzgc8afxFs-epBQ3QDl_EC1Y5mpTS_s";
+
+async function sbInsert(row){
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/scores`,{method:"POST",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Prefer":"return=minimal"},body:JSON.stringify(row)});
+    return r.ok;
+  }catch{return false;}
+}
+async function sbFetch(){
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/scores?select=*&order=score.desc&limit=50`,{headers:{"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`}});
+    if(!r.ok)return null;
+    return await r.json();
+  }catch{return null;}
+}
+
+function dbGet(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch{return null;}}
+function dbSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+
+const DQ=[
+  {type:"tf",text:"Greeting a passenger warmly and confirming their destination before driving is best practice for Bolt drivers.",answer:"True",exp:"A warm greeting sets a positive tone and reduces errors.",pts:10},
+  {type:"mc",text:"A passenger is rude at the start of a trip. Best response?",options:["Respond rudely","Stay calm and professional","Cancel immediately"],answer:1,exp:"Professionalism protects your rating and reflects well on Bolt.",pts:20},
+  {type:"tf",text:"OTP fraud only affects passengers — business clients on Bolt are not at risk.",answer:"False",exp:"Business clients are frequently targeted by OTP fraud on corporate accounts.",pts:10},
+  {type:"mc",text:"A passenger asks you to take a different route. What do you do?",options:["Follow without question","Consider reason and update route in-app","Ignore and follow app"],answer:1,exp:"Passenger preferences matter but always update the route in-app.",pts:20},
+  {type:"tf",text:"Bolt will never ask a driver to share their OTP over the phone or via chat.",answer:"True",exp:"Any contact asking for your OTP is a fraud attempt.",pts:10},
+  {type:"mc",text:"Which best describes excellent service on a Bolt trip?",options:["Drive as fast as possible","Clean car, polite, confirm route, drive safely","Talk throughout the trip"],answer:1,exp:"Great service means a clean vehicle, safe ride, and respectful communication.",pts:10},
+  {type:"tf",text:"A driver's star rating is directly affected by passenger reviews after each trip.",answer:"True",exp:"Passenger ratings feed into your overall rating and bonus eligibility.",pts:10},
+  {type:"mc",text:"A business client reports unauthorised trips on their account. What does this indicate?",options:["A system error","Account fraud — the account may be compromised","The passenger forgot"],answer:1,exp:"Unauthorised trips are a key indicator of account takeover fraud.",pts:30},
+  {type:"tf",text:"Keeping your vehicle clean has no effect on your Bolt driver rating.",answer:"False",exp:"Cleanliness is rated by passengers and directly affects your overall score.",pts:10},
+  {type:"mc",text:"Your passenger's pickup pin is slightly wrong. What do you do?",options:["Cancel and mark no-show","Call the passenger to confirm location","Drive around until you find them"],answer:1,exp:"Always call before cancelling to protect both parties.",pts:20},
+  {type:"tf",text:"A fraudster can take over a Bolt account by convincing a driver to share their OTP.",answer:"True",exp:"Social engineering is the most common fraud method on the platform.",pts:20},
+  {type:"mc",text:"Which 2FA method is most secure for the Bolt app?",options:["SMS OTP","In-app biometric (fingerprint or face ID)","Security question"],answer:1,exp:"Biometric verification is phishing-resistant and cannot be intercepted like OTPs.",pts:30},
+  {type:"tf",text:"If a passenger leaves an item in your vehicle, you are not obligated to help retrieve it.",answer:"False",exp:"Assisting with lost items is part of excellent service and impacts your rating.",pts:20},
+  {type:"mc",text:"What does a high acceptance rate mean for a Bolt driver?",options:["No impact on standing","Can unlock bonuses and priority trips","Only matters during busy hours"],answer:1,exp:"High acceptance signals reliability and can unlock better trip opportunities.",pts:20},
+  {type:"tf",text:"SIM swap fraud lets a criminal receive your OTP on their own phone.",answer:"True",exp:"Criminals can hijack your number via SIM swap to intercept all SMS including OTPs.",pts:30},
+];
+
+let Qs,Pf,sc="home",playerName="",rlen="10",pin="",pinErr=false,atab="add";
+let GQs=[],gI=0,gS=0,gC=0,gSt=0,gH=[],gAn=false,gTL=25,gFB=null,opts={};
+let saving=false,nameErr="",LB=[],lbLoading=false,lbErr=false;
+let eidx=null,eq=null,af={type:"tf",text:"",tfa:"True",a:"",b:"",c:"",mca:0,exp:"",pts:10};
+let amsg=null,emsg=null;
+let tmr=null,sR=0,cR=0,stR=0,hR=[],tlR=25;
+
+function init(){Qs=dbGet(KQ)||DQ;Pf=dbGet(KP)||{};render();}
+function go(s){sc=s;window.scrollTo(0,0);render();}
+function sqq(q){Qs=q;dbSet(KQ,q);}
+function spf(p){Pf=p;dbSet(KP,p);}
+
+async function loadLB(){
+  lbLoading=true;lbErr=false;render();
+  const data=await sbFetch();
+  if(data){LB=data;lbErr=false;}else{lbErr=true;}
+  lbLoading=false;render();
+}
+
+function startGame(){
+  playerName=document.getElementById("inp-name")?.value?.trim()||playerName;
+  rlen=document.getElementById("inp-rlen")?.value||rlen;
+  const parts=playerName.split(/\s+/).filter(Boolean);
+  if(parts.length<2){nameErr="Enter your full name as on your Bolt account to continue.";render();return;}
+  if(parts.length>5){nameErr="Name seems too long — please enter your full name only.";render();return;}
+  nameErr="";
+  if(!Qs.length){alert("No questions loaded.");return;}
+  const sh=[...Qs].sort(()=>Math.random()-.5);
+  GQs=rlen==="all"?sh:sh.slice(0,Math.min(parseInt(rlen),sh.length));
+  sR=0;cR=0;stR=0;hR=[];gI=0;gS=0;gC=0;gSt=0;gH=[];gAn=false;gFB=null;opts={};saving=false;
+  go("game");runTmr();
+}
+
+function runTmr(){
+  clearInterval(tmr);tlR=25;gTL=25;
+  tmr=setInterval(()=>{tlR--;gTL=tlR;updTimer();if(tlR<=0){clearInterval(tmr);hTO();}},1000);
+}
+
+function updTimer(){
+  const el=document.getElementById("timer");
+  if(el){el.textContent=gTL;el.style.borderColor=gTL<=5?"#ef4444":G;el.style.color=gTL<=5?"#ef4444":G;}
+}
+
+function hTO(){
+  const q=GQs[gI];const cA=q.type==="tf"?q.answer:q.options[q.answer];
+  const no={};
+  if(q.type==="tf")["True","False"].forEach(v=>{if(v===q.answer)no[v]="ok";});
+  else q.options.forEach((_,i)=>{if(i===q.answer)no[i]="ok";});
+  opts=no;stR=0;gSt=0;
+  const np={...Pf};const oi=Qs.findIndex(x=>x.text===q.text);
+  if(oi>=0){if(!np[oi])np[oi]={correct:0,wrong:0};np[oi].wrong++;spf(np);}
+  hR=[...hR,{question:q.text,playerAnswer:null,correctAnswer:cA,result:"to",exp:q.exp}];
+  gH=[...hR];gAn=true;gFB={t:"to",msg:`Time's up! Correct: ${cA}${q.exp?" — "+q.exp:""}`};
+  render();
+}
+
+function ans(val){
+  if(gAn)return;clearInterval(tmr);
+  const q=GQs[gI];const ok=val===q.answer;
+  const cA=q.type==="tf"?q.answer:q.options[q.answer];
+  const pA=q.type==="tf"?val:q.options[val];
+  const no={};
+  if(q.type==="tf")["True","False"].forEach(v=>{if(v===q.answer)no[v]="ok";else if(v===val&&!ok)no[v]="no";});
+  else q.options.forEach((_,i)=>{if(i===q.answer)no[i]="ok";else if(i===val&&!ok)no[i]="no";});
+  opts=no;
+  const np={...Pf};const oi=Qs.findIndex(x=>x.text===q.text);
+  if(oi>=0){if(!np[oi])np[oi]={correct:0,wrong:0};ok?np[oi].correct++:np[oi].wrong++;spf(np);}
+  if(ok){
+    const tb=tlR>=10?1:tlR>=5?.7:.5;const sb=stR>=3?1.5:stR>=2?1.25:1;
+    const er=Math.round(q.pts*tb*sb);
+    sR+=er;cR++;stR++;gS=sR;gC=cR;gSt=stR;
+    gFB={t:"ok",msg:`Correct!${stR>=3?` 🔥 ${stR}x streak!`:""} +${er} pts. ${q.exp||""}`};
+  }else{
+    stR=0;gSt=0;
+    gFB={t:"no",msg:`Incorrect. Correct: ${cA}${q.exp?" — "+q.exp:""}`};
+  }
+  hR=[...hR,{question:q.text,playerAnswer:pA,correctAnswer:cA,result:ok?"ok":"no",exp:q.exp}];
+  gH=[...hR];gAn=true;render();
+}
+
+async function nextQ(){
+  const ni=gI+1;
+  if(ni>=GQs.length){
+    const tot=GQs.length,acc=Math.round((cR/tot)*100);
+    saving=true;render();
+    await sbInsert({name:playerName,score:sR,correct:cR,total:tot,accuracy:acc});
+    saving=false;
+    go("result");return;
+  }
+  gI=ni;gAn=false;gFB=null;opts={};render();runTmr();
+}
+
+function addQ(){
+  const type=document.getElementById("af-type").value;
+  const text=document.getElementById("af-text").value.trim();
+  const exp=document.getElementById("af-exp").value.trim();
+  const pts=parseInt(document.getElementById("af-pts").value);
+  if(!text||!exp){amsg="er";render();return;}
+  let q;
+  if(type==="tf"){const tfa=document.getElementById("af-tfa").value;q={type,text,answer:tfa,exp,pts};}
+  else{
+    const a=document.getElementById("af-a").value.trim(),b=document.getElementById("af-b").value.trim(),c=document.getElementById("af-c").value.trim();
+    const mca=parseInt(document.getElementById("af-mca").value);
+    if(!a||!b||!c){amsg="er";render();return;}
+    q={type,text,options:[a,b,c],answer:mca,exp,pts};
+  }
+  sqq([...Qs,q]);af={type:"tf",text:"",tfa:"True",a:"",b:"",c:"",mca:0,exp:"",pts:10};
+  amsg="ok";render();setTimeout(()=>{amsg=null;render();},2500);
+}
+
+function saveEdit(){
+  const type=document.getElementById("eq-type").value;
+  const text=document.getElementById("eq-text").value.trim();
+  const exp=document.getElementById("eq-exp").value.trim();
+  const pts=parseInt(document.getElementById("eq-pts").value);
+  if(!text||!exp){emsg="er";render();return;}
+  let q;
+  if(type==="tf"){const tfa=document.getElementById("eq-tfa").value;q={type,text,answer:tfa,exp,pts};}
+  else{
+    const a=document.getElementById("eq-a").value.trim(),b=document.getElementById("eq-b").value.trim(),c=document.getElementById("eq-c").value.trim();
+    const mca=parseInt(document.getElementById("eq-mca").value);
+    if(!a||!b||!c){emsg="er";render();return;}
+    q={type,text,options:[a,b,c],answer:mca,exp,pts};
+  }
+  const nq=[...Qs];nq[eidx]=q;sqq(nq);
+  emsg="ok";render();setTimeout(()=>{eidx=null;eq=null;emsg=null;render();},1200);
+}
+
+function openEdit(i){
+  const q=Qs[i];eidx=i;
+  eq={type:q.type,text:q.text,tfa:q.type==="tf"?q.answer:"True",a:q.options?q.options[0]:"",b:q.options?q.options[1]:"",c:q.options?q.options[2]:"",mca:q.type==="mc"?q.answer:0,exp:q.exp,pts:q.pts};
+  render();
+}
+
+function boltLogo(){
+  return`<svg viewBox="0 0 220 90" width="110" height="44" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto 8px"><text x="110" y="68" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="72" fill="#fff" letter-spacing="-2">Bolt</text><circle cx="163" cy="82" r="6" fill="#fff"/></svg>`;
+}
+
+function hdr(sub){
+  return`<div class="hdr">${boltLogo()}<h1>BoltIQ</h1>${sub?`<p>${sub}</p>`:""}</div>`;
+}
+
+function bdg(t,txt){
+  const map={tf:"bdg-tf",mc:"bdg-mc",easy:"bdg-easy",med:"bdg-med",hard:"bdg-hard"};
+  return`<span class="bdg ${map[t]||"bdg-easy"}">${txt}</span>`;
+}
+
+function rmsg(a){
+  return a===100?"🏆 Perfect score! You are a Bolt platform expert.":a>=80?"🌟 Excellent work — strong platform knowledge!":a>=60?"👍 Good effort. Review the wrong answers and try again.":"📚 Keep learning — every attempt makes you better!";
+}
+
+function mcFields(obj,pre){
+  return["a","b","c"].map((k,i)=>`<label>Option ${String.fromCharCode(65+i)}</label><input id="${pre}-${k}" value="${obj[k]||""}" placeholder="Option ${String.fromCharCode(65+i)}" oninput="${pre==="af"?"af":"eq"}.${k}=this.value"/>`).join("")+
+  `<label>Correct option</label><select id="${pre}-mca" onchange="${pre==="af"?"af":"eq"}.mca=parseInt(this.value)">${["A","B","C"].map((l,i)=>`<option value="${i}" ${obj.mca===i?"selected":""}>${l}</option>`).join("")}</select>`;
+}
+
+function render(){
+  const app=document.getElementById("app");
+  const tot=GQs.length;
+  const acc=tot?Math.round((cR/tot)*100):0;
+  const myRank=LB.findIndex(e=>e.name===playerName&&e.score===sR)+1;
+
+  if(sc==="home"){
+    app.innerHTML=`
+    ${hdr("Driver education & platform knowledge")}
+    <div class="card">
+      <label>Your full name</label>
+      <input id="inp-name" value="${playerName}" placeholder="e.g. Kwame Mensah" maxlength="60" style="${nameErr?"border-color:#ef4444":""}" oninput="playerName=this.value;nameErr='';document.getElementById('name-err').style.display='none'"/>
+      <div id="name-err" class="al-er" style="margin-bottom:.5rem;${nameErr?"":"display:none"}">⚠ ${nameErr}</div>
+      <label>Round length</label>
+      <select id="inp-rlen" onchange="rlen=this.value">
+        <option value="5" ${rlen==="5"?"selected":""}>5 questions</option>
+        <option value="10" ${rlen==="10"?"selected":""}>10 questions</option>
+        <option value="15" ${rlen==="15"?"selected":""}>15 questions</option>
+        <option value="all" ${rlen==="all"?"selected":""}>All questions</option>
+      </select>
+      <div class="tip">💡 Answer quickly for bonus points! 🎁 GHC 100 reward for top 3 drivers with most points — coming soon!</div>
+      <button class="btn-p" onclick="startGame()">▶ Start quiz</button>
+      <button class="btn-s" onclick="go('lb');loadLB()">🏆 Leaderboard</button>
+      <button class="btn-g" onclick="pin='';pinErr=false;go('pin')">⚙ Admin panel</button>
+    </div>`;
+    return;
+  }
+
+  if(sc==="pin"){
+    app.innerHTML=`
+    ${hdr("Admin access")}
+    <div class="card">
+      <label>PIN</label>
+      <input id="pin-inp" type="password" value="${pin}" placeholder="••••" maxlength="8" style="letter-spacing:6px;font-size:22px;text-align:center" oninput="pin=this.value" onkeydown="if(event.key==='Enter'){if(pin==='${PIN}'){pinErr=false;atab='add';go('admin')}else{pinErr=true;render()}}"/>
+      <button class="btn-p" onclick="if(pin==='${PIN}'){pinErr=false;atab='add';go('admin')}else{pinErr=true;render()}">Unlock</button>
+      <button class="btn-s" onclick="go('home')">Cancel</button>
+      ${pinErr?'<div class="al-er">Incorrect PIN.</div>':""}
+    </div>`;
+    return;
+  }
+
+  if(sc==="admin"){
+    const qsHtml=Qs.length===0?'<div style="text-align:center;padding:2rem;color:#888">No questions yet.</div>':
+      Qs.map((q,i)=>{
+        const an=q.type==="tf"?q.answer:q.options[q.answer];
+        const df=q.pts===10?"easy":q.pts===20?"med":"hard";
+        return`<div class="qrow">
+          <div style="display:flex;align-items:flex-start;gap:8px">
+            ${bdg(q.type==="tf"?"tf":"mc",q.type==="tf"?"T/F":"MCQ")}
+            <span style="flex:1;font-size:13px;line-height:1.45">${q.text}</span>
+            <div style="display:flex;gap:5px;flex-shrink:0">
+              <button class="btn-sm" style="background:#dbeafe;color:#1d4ed8;border-color:#93c5fd" onclick="openEdit(${i})">✏ Edit</button>
+              <button class="btn-sm" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5" onclick="if(confirm('Delete?')){Qs=Qs.filter((_,j)=>j!==${i});sqq(Qs);render()}">✕</button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#666;margin-top:6px">${bdg(df,q.pts+" pts")} ✓ <strong>${an}</strong></div>
+        </div>`;}).join("");
+
+    const anHtml=Qs.length===0?'<p style="font-size:13px;color:#888">No data yet.</p>':
+      Qs.map((q,i)=>{
+        const p=Pf[i]||{correct:0,wrong:0};const t=p.correct+p.wrong;const pc=t?Math.round((p.correct/t)*100):0;
+        return`<div style="margin-bottom:1rem">
+          <div style="font-size:12px;font-weight:600;line-height:1.4;margin-bottom:5px">${i+1}. ${q.text.length>75?q.text.slice(0,75)+"…":q.text}</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1;height:8px;background:#fde8e8;border-radius:999px;overflow:hidden"><div style="height:100%;width:${pc}%;background:#39B54A;border-radius:999px"></div></div>
+            <span style="font-size:11px;color:#666;min-width:78px;text-align:right">${p.correct}✓ ${p.wrong}✗ ${t?pc+"%":"—"}</span>
+          </div>
+        </div>`;}).join("");
+
+    const lbHtml=lbLoading?'<div class="lb-loading">⏳ Loading…</div>':
+      lbErr?'<div class="lb-err">Could not load. Check connection.</div>':
+      LB.length===0?'<p style="font-size:13px;color:#888">No scores yet.</p>':
+      LB.slice(0,50).map((e,i)=>`<div class="lbr">
+        <span style="width:28px;font-weight:800;color:#888">${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</span>
+        <span style="flex:1;font-weight:600">${e.name}</span>
+        <span style="font-size:11px;color:#888">${e.correct}/${e.total} · ${e.accuracy}%</span>
+        <span style="font-weight:800;color:#39B54A;min-width:56px;text-align:right">${e.score} pts</span>
+      </div>`).join("");
+
+    const afMcHtml=af.type==="mc"?mcFields(af,"af"):`<label>Correct answer</label><select id="af-tfa" onchange="af.tfa=this.value"><option ${af.tfa==="True"?"selected":""}>True</option><option ${af.tfa==="False"?"selected":""}>False</option></select>`;
+    const eqMcHtml=eq&&eq.type==="mc"?mcFields(eq,"eq"):eq?`<label>Answer</label><select id="eq-tfa" onchange="eq.tfa=this.value"><option ${eq.tfa==="True"?"selected":""}>True</option><option ${eq.tfa==="False"?"selected":""}>False</option></select>`:"";
+
+    app.innerHTML=`
+    ${hdr(Qs.length+" question"+(Qs.length!==1?"s":"")+" loaded")}
+    <div class="tabs">
+      <button class="tab ${atab==="add"?"tab-on":"tab-off"}" onclick="atab='add';render()">Add question</button>
+      <button class="tab ${atab==="qs"?"tab-on":"tab-off"}" onclick="atab='qs';render()">Questions</button>
+      <button class="tab ${atab==="an"?"tab-on":"tab-off"}" onclick="atab='an';loadLB();render()">Analytics</button>
+    </div>
+    ${atab==="add"?`<div class="card">
+      <label>Question type</label>
+      <select id="af-type" onchange="af.type=this.value;render()">
+        <option value="tf" ${af.type==="tf"?"selected":""}>True / False</option>
+        <option value="mc" ${af.type==="mc"?"selected":""}>Multiple choice</option>
+      </select>
+      <label>Question text</label>
+      <textarea id="af-text" placeholder="Type your question here…" oninput="af.text=this.value">${af.text}</textarea>
+      ${afMcHtml}
+      <label>Explanation</label>
+      <textarea id="af-exp" placeholder="Explain the correct answer…" oninput="af.exp=this.value">${af.exp}</textarea>
+      <label>Point value</label>
+      <select id="af-pts" onchange="af.pts=parseInt(this.value)">
+        <option value="10" ${af.pts===10?"selected":""}>10 pts — Easy</option>
+        <option value="20" ${af.pts===20?"selected":""}>20 pts — Medium</option>
+        <option value="30" ${af.pts===30?"selected":""}>30 pts — Hard</option>
+      </select>
+      <button class="btn-p" onclick="addQ()">+ Save question</button>
+      ${amsg==="ok"?'<div class="al-ok">✓ Question saved.</div>':amsg==="er"?'<div class="al-er">Please fill in all fields.</div>':""}
+    </div>`:""}
+    ${atab==="qs"?`<div>${qsHtml}<hr class="divider"/><button class="btn-d" onclick="if(confirm('Delete ALL?')){sqq([]);render()}">🗑 Clear all questions</button></div>`:""}
+    ${atab==="an"?`<div>
+      <div class="card"><div style="font-size:14px;font-weight:700;margin-bottom:1rem">Question performance</div>${anHtml}</div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+          <span style="font-size:14px;font-weight:700">Live leaderboard <span class="lb-live">● LIVE</span></span>
+          <button class="btn-sm" style="background:#e8f7ea;color:#1e7a2e;border-color:#b7e4bf" onclick="loadLB()">↻ Refresh</button>
+        </div>
+        ${lbHtml}
+      </div>
+    </div>`:""}
+    <hr class="divider"/>
+    <button class="btn-g" onclick="go('home')">← Back to home</button>
+    ${eidx!==null&&eq?`<div class="modal-bg" onclick="if(event.target===this){eidx=null;eq=null;render()}">
+      <div class="modal">
+        <div style="font-size:16px;font-weight:800;margin-bottom:1rem">Edit question</div>
+        <label>Type</label>
+        <select id="eq-type" onchange="eq.type=this.value;render()">
+          <option value="tf" ${eq.type==="tf"?"selected":""}>True / False</option>
+          <option value="mc" ${eq.type==="mc"?"selected":""}>Multiple choice</option>
+        </select>
+        <label>Question</label><textarea id="eq-text" oninput="eq.text=this.value">${eq.text}</textarea>
+        ${eqMcHtml}
+        <label>Explanation</label><textarea id="eq-exp" oninput="eq.exp=this.value">${eq.exp}</textarea>
+        <label>Points</label>
+        <select id="eq-pts" onchange="eq.pts=parseInt(this.value)">
+          <option value="10" ${eq.pts===10?"selected":""}>10</option>
+          <option value="20" ${eq.pts===20?"selected":""}>20</option>
+          <option value="30" ${eq.pts===30?"selected":""}>30</option>
+        </select>
+        ${emsg==="er"?'<div class="al-er">Fill all fields.</div>':emsg==="ok"?'<div class="al-ok">✓ Updated.</div>':""}
+        <button class="btn-p" onclick="saveEdit()">Save changes</button>
+        <button class="btn-s" onclick="eidx=null;eq=null;emsg=null;render()">Cancel</button>
+      </div>
+    </div>`:""}`;
+    return;
+  }
+
+  if(sc==="game"){
+    const curQ=GQs[gI];
+    const optHtml=curQ.type==="tf"?
+      ["True","False"].map(v=>`<button class="opt ${opts[v]==="ok"?"opt-ok":opts[v]==="no"?"opt-no":""}" ${gAn?"disabled":""} onclick="ans('${v}')">${v}</button>`).join(""):
+      curQ.options.map((o,i)=>`<button class="opt ${opts[i]==="ok"?"opt-ok":opts[i]==="no"?"opt-no":""}" ${gAn?"disabled":""} onclick="ans(${i})"><strong style="margin-right:6px">${String.fromCharCode(65+i)}.</strong>${o}</button>`).join("");
+    const df=curQ.pts===10?"easy":curQ.pts===20?"med":"hard";
+
+    app.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+      <div>
+        <span style="font-size:12px;color:#777">Q </span>
+        <span style="font-size:13px;font-weight:800">${gI+1} of ${tot}</span>
+        ${gSt>=2?`<span class="streak">🔥 ${gSt}x streak</span>`:""}
+      </div>
+      <div id="timer" class="timer" style="border:3px solid ${G};color:${G}">${gTL}</div>
+    </div>
+    <div class="progress"><div class="progress-bar" style="width:${Math.round((gI/tot)*100)}%"></div></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:.9rem;font-size:13px;color:#666">
+      <span>Score: <strong style="color:${G};font-size:16px">${gS}</strong></span>
+      <span style="font-weight:700;color:#333">${playerName}</span>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:.85rem">
+        ${bdg(curQ.type==="tf"?"tf":"mc",curQ.type==="tf"?"True / False":"Multiple choice")}
+        <span style="font-size:11px;color:#888">${curQ.pts} pts</span>
+      </div>
+      <p style="font-size:15px;font-weight:700;line-height:1.6;margin-bottom:1rem">${curQ.text}</p>
+      ${optHtml}
+    </div>
+    ${gFB?`<div class="fb fb-${gFB.t}"><strong>${gFB.t==="ok"?"✓ ":gFB.t==="to"?"⏱ ":"✗ "}</strong>${gFB.msg}</div>`:""}
+    ${gAn?`<button class="btn-p" ${saving?"disabled":""} onclick="nextQ()">${saving?"Saving…":gI+1>=tot?"🏁 See my results":"Next question →"}</button>`:""}`;
+    return;
+  }
+
+  if(sc==="result"){
+    app.innerHTML=`
+    ${hdr("Well done, "+playerName+"!")}
+    <div class="stat-grid">
+      ${[["Score",sR,true],["Correct",cR+"/"+tot,false],["Accuracy",acc+"%",false],["Rank",myRank>0?"#"+myRank:"—",true]].map(([l,v,g])=>`
+        <div class="stat"><div style="font-size:28px;font-weight:800;color:${g?G:"#111"};line-height:1.1">${v}</div><div style="font-size:10px;color:#666;margin-top:4px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">${l}</div></div>`).join("")}
+    </div>
+    <div class="card"><p style="font-size:14px;color:#555;line-height:1.65">${rmsg(acc)}</p></div>
+    <button class="btn-p" onclick="go('review')">📋 Review my answers</button>
+    <button class="btn-s" onclick="go('lb');loadLB()">🏆 View leaderboard</button>
+    <button class="btn-g" onclick="go('home')">↩ Play again</button>`;
+    return;
+  }
+
+  if(sc==="review"){
+    const rows=gH.map((h,i)=>`<div class="ri ri-${h.result}">
+      <div style="font-size:13px;font-weight:700;margin-bottom:.4rem;line-height:1.45">${i+1}. ${h.question}</div>
+      <div style="font-size:12px;color:#555;line-height:1.6">
+        ${h.result==="to"?'<span style="color:#b45309;font-weight:700">⏱ Timed out</span>':`Your answer: <strong>${h.playerAnswer}</strong>`}
+        ${h.result!=="ok"?`<br/>Correct: <strong style="color:#15803d">${h.correctAnswer}</strong>`:""}
+        ${h.result==="ok"?'<br/><strong style="color:#15803d">✓ Correct!</strong>':""}
+        ${h.exp?`<br/><em style="color:#777;font-size:12px">${h.exp}</em>`:""}
+      </div>
+    </div>`).join("");
+    app.innerHTML=`
+    ${hdr(cR+" correct · "+(gH.length-cR)+" incorrect · "+sR+" pts")}
+    ${rows}
+    <button class="btn-s" onclick="go('lb');loadLB()">🏆 Leaderboard</button>
+    <button class="btn-g" onclick="go('home')">↩ Play again</button>`;
+    return;
+  }
+
+  if(sc==="lb"){
+    const lbRows=lbLoading?'<div class="lb-loading">⏳ Loading scores…</div>':
+      lbErr?'<div class="lb-err">Could not load scores. Check your connection and try refreshing.</div>':
+      LB.length===0?'<div style="text-align:center;padding:2.5rem;color:#999">No scores yet — be the first!</div>':
+      LB.slice(0,50).map((e,i)=>`<div class="lbr">
+        <span style="width:30px;font-weight:800;color:#999">${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</span>
+        <span style="flex:1;font-weight:600">${e.name}</span>
+        <span style="font-size:11px;color:#888">${e.correct}/${e.total} · ${e.accuracy}%</span>
+        <span style="font-weight:800;color:#39B54A;min-width:56px;text-align:right">${e.score} pts</span>
+      </div>`).join("");
+    app.innerHTML=`
+    ${hdr("All drivers — live rankings")}
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+        <span style="font-size:13px;font-weight:700">🏆 Leaderboard <span class="lb-live">● LIVE</span></span>
+        <button class="btn-sm" style="background:#e8f7ea;color:#1e7a2e;border-color:#b7e4bf" onclick="loadLB()">↻ Refresh</button>
+      </div>
+      ${lbRows}
+    </div>
+    <button class="btn-g" onclick="go('home')">← Back to home</button>`;
+    return;
+  }
+}
+
+init();
+</script>
+</body>
+</html>
