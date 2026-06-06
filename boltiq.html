@@ -338,7 +338,7 @@ function startRound(roundNum){
 }
 
 function runTmr(){
-  clearInterval(tmr);tlR=25;gTL=25;
+  clearInterval(tmr);tlR=30;gTL=30;
   tmr=setInterval(()=>{tlR--;gTL=tlR;updTimer();if(tlR<=0){clearInterval(tmr);hTO();}},1000);
 }
 
