@@ -240,19 +240,18 @@ let deleteModal=null; // {type:"weekly"|"monthly", name:String}
 let LB=[],lbLoading=false,lbErr=false;
 let monthlyLB=[],monthlyLoading=false;
 let lbTab="weekly";
+let dailyLB=null,dailyLoading=false,dailyErr=null,selectedDay=null;
 let eidx=null,eq=null;
 let af={type:"tf",text:"",tfa:"True",a:"",b:"",c:"",mca:0,exp:"",pts:10};
 let amsg=null,emsg=null;
-let tmr=null,sR=0,cR=0,stR=0,hR=[],tlR=25;
-let currentRound=0; // 1,2,3
-let completedRounds={}; // {1:{score,correct,total,accuracy}, 2:..., 3:...}
-let weekQs={1:[],2:[],3:[]}; // questions per round loaded from supabase
+let tmr=null,sR=0,cR=0,stR=0,hR=[],tlR=30;
+let completedGame=null; // {score,correct,total,accuracy} — single game per week
+let weekQs=[]; // 25 questions loaded from supabase
 let weekQsLoading=false;
-let adminRoundTab=1;
-let adminRoundQs={1:[],2:[],3:[]};
+let adminQs=[]; // questions in admin panel
 let publishMsg=null;
-let historyWeekOffset=0; // 0=current week, 1=one week ago, etc.
-let historyLB=null; // null=not loaded yet, []=loaded
+let historyWeekOffset=0;
+let historyLB=null;
 let historyLoading=false;
 let historyErr=null;
 
@@ -260,7 +259,6 @@ let historyErr=null;
 async function init(){
   Qs=dbGet(KQ)||DQ;
   Pf=dbGet(KP)||{};
-  // Restore name and city from last session
   const savedName=dbGet("biq_player_name");
   const savedCity=dbGet("biq_player_city");
   const savedWeek=dbGet("biq_player_week");
@@ -268,17 +266,14 @@ async function init(){
   if(savedName&&savedCity&&savedWeek===thisWeek){
     playerName=savedName;
     playerCity=savedCity;
-    // Restore completed rounds for this player this week
-    const savedRounds=dbGet("biq_completed_rounds_"+thisWeek+"_"+savedName);
-    if(savedRounds)completedRounds=savedRounds;
+    const savedGame=dbGet("biq_completed_game_"+thisWeek+"_"+savedName);
+    if(savedGame)completedGame=savedGame;
   } else if(savedWeek&&savedWeek!==thisWeek){
-    // New week — clear stale completed rounds
-    completedRounds={};
-    if(savedName)dbSet("biq_completed_rounds_"+savedWeek+"_"+savedName,null);
+    completedGame=null;
+    if(savedName)dbSet("biq_completed_game_"+savedWeek+"_"+savedName,null);
   }
-  await loadCompletedRounds();
+  await loadCompletedGame();
   await loadWeekQuestions();
-  // If admin mode URL param is set, go straight to PIN screen
   if(adminMode){sc="pin";pin="";pinErr=false;}
   render();
 }
@@ -296,14 +291,15 @@ async function go(s){
 function sqq(q){Qs=q;dbSet(KQ,q);}
 function spf(p){Pf=p;dbSet(KP,p);}
 
-// ─── COMPLETED ROUNDS ────────────────────────────────────────────────────────
-async function loadCompletedRounds(){
+// ─── COMPLETED GAME ──────────────────────────────────────────────────────────
+async function loadCompletedGame(){
   if(!playerName)return;
   const ws=currentWeekStart();
   const data=await sbGet(`/rest/v1/rounds?driver_name=eq.${encodeURIComponent(playerName)}&week_start=eq.${ws}&select=*`);
-  completedRounds={};
-  if(data&&Array.isArray(data)){
-    data.forEach(r=>{completedRounds[r.round_number]={score:r.score,correct:r.correct,total:r.total,accuracy:r.accuracy};});
+  completedGame=null;
+  if(data&&Array.isArray(data)&&data.length>0){
+    const r=data[0];
+    completedGame={score:r.score,correct:r.correct,total:r.total,accuracy:r.accuracy};
   }
 }
 
@@ -311,14 +307,12 @@ async function loadCompletedRounds(){
 async function loadWeekQuestions(){
   const ws=currentWeekStart();
   weekQsLoading=true;
-  for(let r=1;r<=3;r++){
-    const data=await sbGet(`/rest/v1/weekly_questions?week_start=eq.${ws}&round_number=eq.${r}&select=questions`);
-    if(data&&data.length>0&&data[0].questions){weekQs[r]=data[0].questions;}
-    else{
-      // fallback to dedicated per-round default questions
-      const pools={1:DQ_R1,2:DQ_R2,3:DQ_R3};
-      weekQs[r]=[...pools[r]].sort(()=>Math.random()-.5);
-    }
+  const data=await sbGet(`/rest/v1/weekly_questions?week_start=eq.${ws}&round_number=eq.1&select=questions`);
+  if(data&&data.length>0&&data[0].questions){
+    weekQs=data[0].questions;
+  }else{
+    // Fallback to combined default questions shuffled
+    weekQs=[...DQ_R1,...DQ_R2,...DQ_R3].sort(()=>Math.random()-.5).slice(0,25);
   }
   weekQsLoading=false;
 }
@@ -357,26 +351,24 @@ async function loadHistoryLB(){
   historyLoading=false;render();
 }
 
-async function publishRoundQuestions(roundNum){
+async function publishQuestions(){
   const ws=currentWeekStart();
-  const qs=adminRoundQs[roundNum];
-  if(!qs||qs.length===0){publishMsg={t:"er",r:roundNum,msg:"No questions set for this round."};render();return;}
-  const sizes={1:10,2:15,3:20};
-  if(qs.length<sizes[roundNum]){publishMsg={t:"er",r:roundNum,msg:`Round ${roundNum} needs at least ${sizes[roundNum]} questions. You have ${qs.length}.`};render();return;}
-  // Check if exists
-  const existing=await sbGet(`/rest/v1/weekly_questions?week_start=eq.${ws}&round_number=eq.${roundNum}&select=id`);
+  const qs=adminQs;
+  if(!qs||qs.length===0){publishMsg={t:"er",msg:"No questions added yet."};render();return;}
+  if(qs.length<25){publishMsg={t:"er",msg:`Need 25 questions. You have ${qs.length}.`};render();return;}
+  const existing=await sbGet(`/rest/v1/weekly_questions?week_start=eq.${ws}&round_number=eq.1&select=id`);
   let ok;
   if(existing&&existing.length>0){
-    ok=await sbPatch(`/rest/v1/weekly_questions?week_start=eq.${ws}&round_number=eq.${roundNum}`,{questions:qs});
+    ok=await sbPatch(`/rest/v1/weekly_questions?week_start=eq.${ws}&round_number=eq.1`,{questions:qs});
   }else{
-    ok=await sbPost("/rest/v1/weekly_questions",{week_start:ws,round_number:roundNum,questions:qs});
+    ok=await sbPost("/rest/v1/weekly_questions",{week_start:ws,round_number:1,questions:qs});
   }
   if(ok!==null){
-    publishMsg={t:"ok",r:roundNum,msg:`Round ${roundNum} questions published for ${formatWeekBadge()}.`};
-    weekQs[roundNum]=qs;
-    adminRoundQs[roundNum]=[...qs]; // keep admin panel in sync
+    publishMsg={t:"ok",msg:`25 questions published for ${formatWeekBadge()}.`};
+    weekQs=qs;
+    adminQs=[...qs];
   }else{
-    publishMsg={t:"er",r:roundNum,msg:"Publish failed. Check connection."};
+    publishMsg={t:"er",msg:"Publish failed. Check connection."};
   }
   render();setTimeout(()=>{publishMsg=null;render();},3000);
 }
@@ -422,7 +414,22 @@ async function loadMonthlyLB(){
   monthlyLoading=false;render();
 }
 
-function confirmDelete(type,name){deleteModal={type,name,busy:false,err:null};render();}
+async function loadDailyLB(dateStr){
+  dailyLoading=true;dailyErr=null;dailyLB=null;selectedDay=dateStr;render();
+  const data=await sbGet(`/rest/v1/rounds?week_start=eq.${currentWeekStart()}&select=driver_name,city,score,correct,total,accuracy,created_at&order=created_at.asc`);
+  if(data){
+    // Filter by selected day (created_at date)
+    const dayData=data.filter(r=>{
+      const d=new Date(r.created_at);
+      return dateToStr(d)===dateStr;
+    });
+    dailyLB=dayData.sort((a,b)=>b.score-a.score);
+    dailyErr=null;
+  }else{
+    dailyLB=[];dailyErr="Could not load data.";
+  }
+  dailyLoading=false;render();
+}
 
 async function doDelete(){
   if(!deleteModal||deleteModal.busy)return;
@@ -452,20 +459,17 @@ async function deleteFromLB(name){confirmDelete("weekly",name);}
 async function deleteFromMonthlyLB(name){confirmDelete("monthly",name);}
 
 // ─── GAME LOGIC ───────────────────────────────────────────────────────────────
-function startRound(roundNum){
-  if(completedRounds[roundNum])return;
-  currentRound=roundNum;
-  const sizes={1:10,2:15,3:20};
-  const pool=weekQs[roundNum]&&weekQs[roundNum].length>0?weekQs[roundNum]:Qs;
-  // Same questions, shuffled order
-  const shuffled=[...pool].sort(()=>Math.random()-.5).slice(0,sizes[roundNum]);
+function startGame(){
+  if(completedGame)return;
+  const pool=weekQs&&weekQs.length>0?weekQs:[...DQ_R1,...DQ_R2,...DQ_R3];
+  const shuffled=[...pool].sort(()=>Math.random()-.5).slice(0,25);
   GQs=shuffled;
   sR=0;cR=0;stR=0;hR=[];gI=0;gS=0;gC=0;gSt=0;gH=[];gAn=false;gFB=null;opts={};pendingAns=null;saving=false;
   go("game");runTmr();
 }
 
 function runTmr(){
-  clearInterval(tmr);tlR=25;gTL=25;
+  clearInterval(tmr);tlR=30;gTL=30;
   tmr=setInterval(()=>{tlR--;gTL=tlR;updTimer();if(tlR<=0){clearInterval(tmr);hTO();}},1000);
 }
 
@@ -538,25 +542,20 @@ async function nextQ(){
     const tot=GQs.length,acc=Math.round((cR/tot)*100);
     saving=true;render();
     const ws=currentWeekStart();
-    const payload={driver_name:playerName,week_start:ws,round_number:currentRound,score:sR,correct:cR,total:tot,accuracy:acc};
+    const payload={driver_name:playerName,week_start:ws,round_number:1,score:sR,correct:cR,total:tot,accuracy:acc};
     if(playerCity)payload.city=playerCity;
     const saved=await sbPost("/rest/v1/rounds",payload);
-    completedRounds[currentRound]={score:sR,correct:cR,total:tot,accuracy:acc};
-    dbSet("biq_completed_rounds_"+ws+"_"+playerName,completedRounds);
+    completedGame={score:sR,correct:cR,total:tot,accuracy:acc};
+    dbSet("biq_completed_game_"+ws+"_"+playerName,completedGame);
     saving=false;
-    if(!saved){
-      // Save failed — show error but still let player continue
-      saveErr=true;
-    } else {
-      saveErr=false;
-    }
+    if(!saved){saveErr=true;}else{saveErr=false;}
     await go("result");return;
   }
   gI=ni;gAn=false;gFB=null;opts={};pendingAns=null;render();runTmr();
 }
 
 // ─── ADMIN Q MANAGEMENT ──────────────────────────────────────────────────────
-function addAdminRoundQ(){
+function addAdminQ(){
   const type=document.getElementById("af-type").value;
   const text=document.getElementById("af-text").value.trim();
   const exp=document.getElementById("af-exp").value.trim();
@@ -570,7 +569,7 @@ function addAdminRoundQ(){
     if(!a||!b||!c){amsg="er";render();return;}
     q={type,text,options:[a,b,c],answer:mca,exp,pts};
   }
-  adminRoundQs[adminRoundTab]=[...adminRoundQs[adminRoundTab],q];
+  adminQs=[...adminQs,q];
   af={type:"tf",text:"",tfa:"True",a:"",b:"",c:"",mca:0,exp:"",pts:10};
   amsg="ok";render();setTimeout(()=>{amsg=null;render();},2000);
 }
@@ -589,16 +588,15 @@ async function saveEdit(){
     if(!a||!b||!c){emsg="er";render();return;}
     q={type,text,options:[a,b,c],answer:mca,exp,pts};
   }
-  const nq=[...adminRoundQs[adminRoundTab]];nq[eidx]=q;adminRoundQs[adminRoundTab]=nq;
-  // Auto-save back to Supabase so the edit is permanent
+  const nq=[...adminQs];nq[eidx]=q;adminQs=nq;
   const ws=currentWeekStart();
-  await sbPatch(`/rest/v1/weekly_questions?week_start=eq.${ws}&round_number=eq.${adminRoundTab}`,{questions:nq});
-  weekQs[adminRoundTab]=nq;
+  await sbPatch(`/rest/v1/weekly_questions?week_start=eq.${ws}&round_number=eq.1`,{questions:nq});
+  weekQs=nq;
   emsg="ok";render();setTimeout(()=>{eidx=null;eq=null;emsg=null;render();},1200);
 }
 
 function openEdit(i){
-  const q=adminRoundQs[adminRoundTab][i];eidx=i;
+  const q=adminQs[i];eidx=i;
   eq={type:q.type,text:q.text,tfa:q.type==="tf"?q.answer:"True",a:q.options?q.options[0]:"",b:q.options?q.options[1]:"",c:q.options?q.options[2]:"",mca:q.type==="mc"?q.answer:0,exp:q.exp,pts:q.pts};
   render();
 }
@@ -647,38 +645,28 @@ function render(){
 
   // ── HOME ──
   if(sc==="home"){
-    const doneCount=Object.keys(completedRounds).length;
-    const allDone=doneCount===3;
-    const weeklyTotal=Object.values(completedRounds).reduce((s,r)=>s+r.score,0);
+    const weeklyTotal=completedGame?completedGame.score:0;
 
-    const roundCards=[1,2,3].map(r=>{
-      const sizes={1:10,2:15,3:20};
-      const done=completedRounds[r];
-      if(done){
-        return`<div class="round-card done">
-          <div class="round-num done">✓</div>
-          <div class="round-info">
-            <div class="round-title">Round ${r} — ${sizes[r]} questions</div>
-            <div class="round-sub">Completed · ${done.correct}/${done.total} correct · ${done.accuracy}%</div>
-          </div>
-          <div class="round-score">${done.score} pts</div>
-        </div>`;
-      }
-      return`<div class="round-card active" onclick="startRound(${r})">
-        <div class="round-num active">${r}</div>
+    const gameCard=completedGame?
+      `<div class="round-card done">
+        <div class="round-num done">✓</div>
         <div class="round-info">
-          <div class="round-title">Round ${r} — ${sizes[r]} questions</div>
-          <div class="round-sub">${3-doneCount>0?`Tap to play`:"Locked"}</div>
+          <div class="round-title">BoltIQ Quiz — 25 questions</div>
+          <div class="round-sub">Completed · ${completedGame.correct}/${completedGame.total} correct · ${completedGame.accuracy}%</div>
+        </div>
+        <div class="round-score">${completedGame.score} pts</div>
+      </div>`:
+      `<div class="round-card active" onclick="startGame()">
+        <div class="round-num active">▶</div>
+        <div class="round-info">
+          <div class="round-title">BoltIQ Quiz — 25 questions</div>
+          <div class="round-sub">Tap to play · 30 seconds per question</div>
         </div>
         <div style="font-size:13px;color:#39B54A;font-weight:700">Play →</div>
       </div>`;
-    }).join("");
 
-    const notif=!allDone&&doneCount>0?
-      `<div class="tip">📋 Complete all 3 rounds to maximise your weekly score! ${3-doneCount} round${3-doneCount>1?"s":""} remaining.</div>`:"";
-
-    const weekTotalBlock=doneCount>0?
-      `<div class="weekly-total"><div style="font-size:12px;font-weight:600;opacity:.85;margin-bottom:4px">YOUR WEEKLY TOTAL SO FAR</div><div style="font-size:36px;font-weight:800">${weeklyTotal} pts</div><div style="font-size:12px;opacity:.8;margin-top:2px">${doneCount}/3 rounds completed</div></div>`:"";
+    const weekTotalBlock=completedGame?
+      `<div class="weekly-total"><div style="font-size:12px;font-weight:600;opacity:.85;margin-bottom:4px">YOUR SCORE THIS WEEK</div><div style="font-size:36px;font-weight:800">${weeklyTotal} pts</div><div style="font-size:12px;opacity:.8;margin-top:2px">${completedGame.correct}/${completedGame.total} correct · ${completedGame.accuracy}% accuracy</div></div>`:"";
 
     const cities=["Accra","Kumasi","Tamale","Takoradi","Cape Coast","Koforidua","Obuasi","Ho"];
     const nameSection=playerName?
@@ -702,7 +690,7 @@ function render(){
     app.innerHTML=`
     ${hdr("A driver education & platform knowledge web app", !!playerName)}
     ${nameSection}
-    ${playerName?`${weekTotalBlock}${notif}${roundCards}
+    ${playerName?`${weekTotalBlock}${gameCard}
     <button class="btn-s" style="margin-top:.5rem" onclick="go('lb')">🏆 Leaderboard</button>
     ${adminMode?`<button class="btn-g" onclick="pin='';pinErr=false;go('pin')">⚙ Admin panel</button>`:""}`:""}`;
     return;
@@ -725,10 +713,9 @@ function render(){
   // ── ADMIN ──
   if(sc==="admin"){
     const ws=currentWeekStart();
-    const sizes={1:10,2:15,3:20};
-    const rQs=adminRoundQs[adminRoundTab]||[];
+    const rQs=adminQs||[];
 
-    const qsHtml=rQs.length===0?'<div style="text-align:center;padding:1.5rem;color:#888">No questions added for this round yet.</div>':
+    const qsHtml=rQs.length===0?'<div style="text-align:center;padding:1.5rem;color:#888">No questions added yet.</div>':
       rQs.map((q,i)=>{
         const an=q.type==="tf"?q.answer:q.options[q.answer];
         const df=q.pts===10?"easy":q.pts===20?"med":"hard";
@@ -765,7 +752,7 @@ function render(){
       LB.map((e,i)=>`<div class="lbr">
         <span style="width:28px;font-weight:800;color:#888">${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</span>
         <span style="flex:1;font-weight:600">${e.name}</span>
-        <span style="font-size:11px;color:#888">${e.city||""} · ${e.rounds}/3</span>
+        <span style="font-size:11px;color:#888">${e.city||""}</span>
         <span style="font-weight:800;color:#39B54A;min-width:52px;text-align:right">${e.total} pts</span>
         <button class="btn-sm" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;flex-shrink:0" onclick="confirmDelete('weekly',LB[${i}].name)">🗑</button>
       </div>`).join("");
@@ -789,11 +776,8 @@ function render(){
     </div>
 
     ${atab==="qs"?`
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:1rem">
-      ${[1,2,3].map(r=>`<button class="tab ${adminRoundTab===r?"tab-on":"tab-off"}" onclick="adminRoundTab=${r};eidx=null;eq=null;render()">Round ${r} (${sizes[r]}Q)</button>`).join("")}
-    </div>
     <div class="card">
-      <div style="font-size:13px;font-weight:700;margin-bottom:.75rem">Add question to Round ${adminRoundTab} <span style="font-size:11px;color:#888;font-weight:400">${rQs.length}/${sizes[adminRoundTab]} added</span></div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:.75rem">Add question <span style="font-size:11px;color:#888;font-weight:400">${adminQs.length}/25 added</span></div>
       <label>Question type</label>
       <select id="af-type" onchange="af.type=this.value;render()">
         <option value="tf" ${af.type==="tf"?"selected":""}>True / False</option>
@@ -810,22 +794,23 @@ function render(){
         <option value="20" ${af.pts===20?"selected":""}>20 pts — Medium</option>
         <option value="30" ${af.pts===30?"selected":""}>30 pts — Hard</option>
       </select>
-      <button class="btn-p" onclick="addAdminRoundQ()">+ Add to Round ${adminRoundTab}</button>
+      <button class="btn-p" onclick="addAdminQ()">+ Add question</button>
       ${amsg==="ok"?'<div class="al-ok">✓ Question added.</div>':amsg==="er"?'<div class="al-er">Please fill in all fields.</div>':""}
     </div>
     <div style="margin-bottom:.75rem">${qsHtml}</div>
-    ${rQs.length>0?`<button class="btn-d" onclick="if(confirm('Clear all Round ${adminRoundTab} questions?')){adminRoundQs[adminRoundTab]=[];render()}">🗑 Clear Round ${adminRoundTab} questions</button>`:""}
-    <button class="btn-p" onclick="publishRoundQuestions(${adminRoundTab})" ${rQs.length<sizes[adminRoundTab]?"disabled":""}>
-      🚀 Publish Round ${adminRoundTab} (${rQs.length}/${sizes[adminRoundTab]} questions)
+    ${adminQs.length>0?`<button class="btn-d" onclick="if(confirm('Clear all questions?')){adminQs=[];render()}">🗑 Clear all questions</button>`:""}
+    <button class="btn-p" onclick="publishQuestions()" ${adminQs.length<25?"disabled":""}>
+      🚀 Publish ${adminQs.length}/25 questions
     </button>
-    ${publishMsg&&publishMsg.r===adminRoundTab?`<div class="${publishMsg.t==="ok"?"al-ok":"al-er"}">${publishMsg.msg}</div>`:""}`:""}
+    ${publishMsg?`<div class="${publishMsg.t==="ok"?"al-ok":"al-er"}">${publishMsg.msg}</div>`:""}`:""}
 
     ${atab==="an"?`<div class="card"><div style="font-size:14px;font-weight:700;margin-bottom:1rem">Question performance</div>${anHtml}</div>`:""}
 
     ${atab==="lb"?`
-    <div class="monthly-tab">
-      <button class="mtab ${lbTab==="weekly"?"mtab-on":"mtab-off"}" onclick="lbTab='weekly';render()">This week</button>
-      <button class="mtab ${lbTab==="monthly"?"mtab-on":"mtab-off"}" onclick="lbTab='monthly';render()">This month</button>
+    <div class="monthly-tab" style="grid-template-columns:1fr 1fr 1fr 1fr">
+      <button class="mtab ${lbTab==="weekly"?"mtab-on":"mtab-off"}" onclick="lbTab='weekly';render()">Weekly</button>
+      <button class="mtab ${lbTab==="daily"?"mtab-on":"mtab-off"}" onclick="lbTab='daily';dailyLB=null;render()">Daily</button>
+      <button class="mtab ${lbTab==="monthly"?"mtab-on":"mtab-off"}" onclick="lbTab='monthly';render()">Monthly</button>
       <button class="mtab ${lbTab==="history"?"mtab-on":"mtab-off"}" onclick="lbTab='history';historyLB=null;historyWeekOffset=1;render()">History</button>
     </div>
     ${lbTab==="weekly"?`<div class="card">
@@ -834,6 +819,36 @@ function render(){
         <button class="btn-sm" style="background:#e8f7ea;color:#1e7a2e;border-color:#b7e4bf" onclick="loadLB()">↻ Refresh</button>
       </div>
       ${wLbHtml}
+    </div>`:""}
+    ${lbTab==="daily"?`<div class="card">
+      <div style="font-size:14px;font-weight:700;margin-bottom:.75rem">Results by day — ${formatWeekBadge()}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1rem">
+        ${(()=>{
+          const ws=new Date(currentWeekStart());
+          const days=[];
+          for(let i=0;i<7;i++){
+            const d=new Date(ws);d.setDate(ws.getDate()+i);
+            if(d>new Date())break;
+            const ds=dateToStr(d);
+            const label=d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
+            days.push(`<button class="btn-sm" style="${selectedDay===ds?"background:#1e7a2e;color:#fff;border-color:#1e7a2e":"background:#f0faf0;color:#1e7a2e;border-color:#b7e4bf"}" onclick="loadDailyLB('${ds}')">${label}</button>`);
+          }
+          return days.join("");
+        })()}
+      </div>
+      ${!selectedDay?`<div style="text-align:center;padding:1.5rem;color:#888">Tap a day above to load results</div>`:""}
+      ${dailyLoading?`<div style="text-align:center;padding:1.5rem;color:#888">⏳ Loading…</div>`:""}
+      ${dailyErr?`<div class="al-er">⚠ ${dailyErr}</div>`:""}
+      ${dailyLB&&!dailyLoading?dailyLB.length===0?
+        `<div style="text-align:center;padding:1.5rem;color:#888">No players on this day.</div>`:
+        dailyLB.map((e,i)=>`<div class="lbr">
+          <span style="width:28px;font-weight:800;color:#888">${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</span>
+          <span style="flex:1;font-weight:600">${e.driver_name}</span>
+          <span style="font-size:11px;color:#888">${e.city||""}</span>
+          <span style="font-size:11px;color:#888;min-width:60px;text-align:center">${e.correct}/${e.total} · ${e.accuracy}%</span>
+          <span style="font-weight:800;color:#39B54A;min-width:52px;text-align:right">${e.score} pts</span>
+        </div>`).join("")
+      :""}
     </div>`:""}
     ${lbTab==="monthly"?`<div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
@@ -856,7 +871,7 @@ function render(){
         historyLB.map((e,i)=>`<div class="lbr">
           <span style="width:28px;font-weight:800;color:#888">${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</span>
           <span style="flex:1;font-weight:600">${e.name}</span>
-          <span style="font-size:11px;color:#888">${e.city||""} · ${e.rounds}/3</span>
+          <span style="font-size:11px;color:#888">${e.city||""}</span>
           <span style="font-weight:800;color:#39B54A;min-width:52px;text-align:right">${e.total} pts</span>
         </div>`).join("")
       :""}
@@ -921,7 +936,7 @@ function render(){
     app.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
       <div>
-        <span style="font-size:12px;color:#777">Round ${currentRound} · Q </span>
+        <span style="font-size:12px;color:#777">Q </span>
         <span style="font-size:13px;font-weight:800">${gI+1} of ${tot}</span>
         ${gSt>=2?`<span class="streak">🔥 ${gSt}x streak</span>`:""}
       </div>
@@ -942,38 +957,25 @@ function render(){
     </div>
     ${gFB?`<div class="fb fb-${gFB.t}"><strong>${gFB.t==="ok"?"✓ ":gFB.t==="to"?"⏱ ":"✗ "}</strong>${gFB.msg}</div>`:""}
     ${!gAn&&pendingAns!==null?`<button class="btn-p" onclick="checkAns()" style="background:#1e7a2e">✔ Check</button>`:""}
-    ${gAn?`<button class="btn-p" ${saving?"disabled":""} onclick="nextQ()">${saving?"Saving…":gI+1>=tot?"🏁 Finish round":"Next question →"}</button>`:""}`;
+    ${gAn?`<button class="btn-p" ${saving?"disabled":""} onclick="nextQ()">${saving?"Saving…":gI+1>=tot?"🏁 Finish":"Next question →"}</button>`:""}`;
     return;
   }
 
   // ── RESULT ──
   if(sc==="result"){
-    const roundScore=completedRounds[currentRound]||{score:sR,correct:cR,total:GQs.length,accuracy:acc};
-    const weeklyTotal=Object.values(completedRounds).reduce((s,r)=>s+r.score,0);
-    const doneCount=Object.keys(completedRounds).length;
-    const allDone=doneCount===3;
-    const remaining=3-doneCount;
-
-    const roundSummary=[1,2,3].map(r=>{
-      const d=completedRounds[r];
-      if(!d)return`<div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid #f0f5f0;font-size:13px;color:#aaa"><span>Round ${r}</span><span>Not played yet</span></div>`;
-      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid #f0f5f0;font-size:13px"><span style="font-weight:600">Round ${r}</span><span>${d.correct}/${d.total} correct</span><span style="font-weight:800;color:#39B54A">${d.score} pts</span></div>`;
-    }).join("");
-
+    const gameScore=completedGame||{score:sR,correct:cR,total:GQs.length,accuracy:acc};
     app.innerHTML=`
-    ${hdr("Round "+currentRound+" complete!")}
+    ${hdr("Quiz complete! 🎉")}
     <div class="stat-grid">
-      <div class="stat"><div style="font-size:28px;font-weight:800;color:${G};line-height:1.1">${roundScore.score}</div><div style="font-size:10px;color:#666;margin-top:4px;font-weight:700;text-transform:uppercase">Round score</div></div>
-      <div class="stat"><div style="font-size:28px;font-weight:800;line-height:1.1">${roundScore.correct}/${roundScore.total}</div><div style="font-size:10px;color:#666;margin-top:4px;font-weight:700;text-transform:uppercase">Correct</div></div>
-      <div class="stat"><div style="font-size:28px;font-weight:800;line-height:1.1">${roundScore.accuracy}%</div><div style="font-size:10px;color:#666;margin-top:4px;font-weight:700;text-transform:uppercase">Accuracy</div></div>
-      <div class="stat"><div style="font-size:28px;font-weight:800;color:${G};line-height:1.1">${weeklyTotal}</div><div style="font-size:10px;color:#666;margin-top:4px;font-weight:700;text-transform:uppercase">Weekly total</div></div>
+      <div class="stat"><div style="font-size:28px;font-weight:800;color:${G};line-height:1.1">${gameScore.score}</div><div style="font-size:10px;color:#666;margin-top:4px;font-weight:700;text-transform:uppercase">Your score</div></div>
+      <div class="stat"><div style="font-size:28px;font-weight:800;line-height:1.1">${gameScore.correct}/${gameScore.total}</div><div style="font-size:10px;color:#666;margin-top:4px;font-weight:700;text-transform:uppercase">Correct</div></div>
+      <div class="stat"><div style="font-size:28px;font-weight:800;line-height:1.1">${gameScore.accuracy}%</div><div style="font-size:10px;color:#666;margin-top:4px;font-weight:700;text-transform:uppercase">Accuracy</div></div>
     </div>
-    <div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:.75rem;color:#333">All rounds this week</div>${roundSummary}</div>
-    <div class="card"><p style="font-size:14px;color:#555;line-height:1.65">${allDone?"🏆 All 3 rounds complete! Your weekly total is "+weeklyTotal+" pts. Check back next Monday for a new set of questions.":`📋 ${remaining} round${remaining>1?"s":""} remaining — complete all 3 to maximise your weekly score!`}</p></div>
-    ${saveErr?`<div class="al-er">⚠ Score could not be saved to the leaderboard. Check your connection and tap <strong>Retry save</strong> below.${lastSbErr?`<br/><small style="opacity:.7">${lastSbErr}</small>`:""}</div><button class="btn-p" style="background:#b91c1c;margin-bottom:.5rem" onclick="retrySave()">↻ Retry save</button>`:""}
+    <div class="card"><p style="font-size:14px;color:#555;line-height:1.65">🏆 Well done! Check the leaderboard to see where you rank this week. New questions drop every Monday.</p></div>
+    ${saveErr?`<div class="al-er">⚠ Score could not be saved. Check your connection and tap Retry below.${lastSbErr?`<br/><small style="opacity:.7">${lastSbErr}</small>`:""}</div><button class="btn-p" style="background:#b91c1c;margin-bottom:.5rem" onclick="retrySave()">↻ Retry save</button>`:""}
     <button class="btn-p" onclick="go('review')">📋 Review my answers</button>
     <button class="btn-s" onclick="go('lb')">🏆 View leaderboard</button>
-    <button class="btn-g" onclick="go('home')">↩ Back to rounds</button>`;
+    <button class="btn-g" onclick="go('home')">↩ Back to home</button>`;
     return;
   }
 
@@ -989,7 +991,7 @@ function render(){
       </div>
     </div>`).join("");
     app.innerHTML=`
-    ${hdr("Round "+currentRound+" — Answer review")}
+    ${hdr("Answer review")}
     ${rows}
     <button class="btn-s" onclick="go('lb')">🏆 Leaderboard</button>
     <button class="btn-g" onclick="go('result')">← Back to results</button>`;
@@ -1004,7 +1006,7 @@ function render(){
       LB.map((e,i)=>`<div class="lbr">
         <span style="width:30px;font-weight:800;color:#999">${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</span>
         <span style="flex:1;font-weight:600">${e.name}</span>
-        <span style="font-size:11px;color:#888">${e.city||""} · ${e.rounds}/3 rounds</span>
+        <span style="font-size:11px;color:#888">${e.city||""}</span>
         <span style="font-weight:800;color:#39B54A;min-width:56px;text-align:right">${e.total} pts</span>
       </div>`).join("");
 
@@ -1038,26 +1040,22 @@ function render(){
 }
 
 async function deleteAdminQ(i){
-  const nq=adminRoundQs[adminRoundTab].filter((_,j)=>j!==i);
-  adminRoundQs[adminRoundTab]=nq;
-  weekQs[adminRoundTab]=nq;
-  // Auto-save back to Supabase
+  const nq=adminQs.filter((_,j)=>j!==i);
+  adminQs=nq;
+  weekQs=nq;
   const ws=currentWeekStart();
-  await sbPatch(`/rest/v1/weekly_questions?week_start=eq.${ws}&round_number=eq.${adminRoundTab}`,{questions:nq});
+  await sbPatch(`/rest/v1/weekly_questions?week_start=eq.${ws}&round_number=eq.1`,{questions:nq});
   render();
 }
 
 async function goAdmin(){
-  atab='add';
+  atab='qs';
   sc='admin';
   window.scrollTo(0,0);
-  // Load published questions from Supabase into the admin panel for editing
   const ws=currentWeekStart();
-  for(let r=1;r<=3;r++){
-    const data=await sbGet(`/rest/v1/weekly_questions?week_start=eq.${ws}&round_number=eq.${r}&select=questions`);
-    if(data&&data.length>0&&data[0].questions){
-      adminRoundQs[r]=data[0].questions;
-    }
+  const data=await sbGet(`/rest/v1/weekly_questions?week_start=eq.${ws}&round_number=eq.1&select=questions`);
+  if(data&&data.length>0&&data[0].questions){
+    adminQs=data[0].questions;
   }
   render();
 }
@@ -1066,7 +1064,7 @@ async function retrySave(){
   const ws=currentWeekStart();
   const tot=GQs.length,acc=Math.round((cR/tot)*100);
   saving=true;render();
-  const payload={driver_name:playerName,week_start:ws,round_number:currentRound,score:sR,correct:cR,total:tot,accuracy:acc};
+  const payload={driver_name:playerName,week_start:ws,round_number:1,score:sR,correct:cR,total:tot,accuracy:acc};
   if(playerCity)payload.city=playerCity;
   const saved=await sbPost("/rest/v1/rounds",payload);
   saving=false;
@@ -1092,7 +1090,7 @@ async function confirmName(){
   dbSet("biq_player_name",val);
   dbSet("biq_player_city",city);
   dbSet("biq_player_week",currentWeekStart());
-  await loadCompletedRounds();
+  await loadCompletedGame();
   render();
 }
 
