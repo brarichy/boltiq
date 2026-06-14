@@ -609,7 +609,7 @@ function boltLogo(){
 function hdr(sub,showReward=true){
   return`<div class="hdr"><div class="week-badge">${formatWeekBadge()}</div>
   <h1>BoltIQ</h1>${sub?`<p>${sub}</p>`:""}
-  ${showReward?`<div style="margin-top:.6rem;background:rgba(255,255,255,0.15);border-radius:20px;padding:.4rem .9rem;font-size:12px;font-weight:600;color:#fff">🎁 GHC 200 reward for top 3 drivers with most points — coming soon!</div>`:""}</div>`;
+  ${showReward?`<div style="margin-top:.6rem;background:rgba(255,255,255,0.15);border-radius:20px;padding:.4rem .9rem;font-size:12px;font-weight:600;color:#fff">🎁 Reward for top 3 drivers with most points — coming soon!</div>`:""}</div>`;
 }
 
 function bdg(t,txt){
@@ -681,7 +681,7 @@ function render(){
           ${cities.map(c=>`<option value="${c}" ${playerCity===c?"selected":""}>${c}</option>`).join("")}
         </select>
         ${cityErr?`<div class="al-er" style="margin-bottom:.5rem">⚠ ${cityErr}</div>`:""}
-        <div class="tip" style="margin-top:.75rem">💡 Answer quickly for bonus points! 🎁 GHC 200 reward for top 3 drivers with most points — coming soon!</div>
+        <div class="tip" style="margin-top:.75rem">💡 Answer quickly for bonus points! 🎁 Reward for top 3 drivers with most points — coming soon!</div>
         <button class="btn-p" onclick="confirmName()">Continue →</button>
         <button class="btn-s" onclick="go('lb')">🏆 View leaderboard</button>
         ${adminMode?`<button class="btn-g" onclick="pin='';pinErr=false;go('pin')">⚙ Admin panel</button>`:""}
